@@ -48,11 +48,14 @@ class S3Bucket(BaseModel):
             f.write(str(file_content) * size)
         return random_file_name
 
-    def file_upload(self, file_name, bucket_name=None):
+    def file_upload(self, file_name, bucket_name=None, extra_args={}):
         # Upload the file to the bucket
+        # Note to use ExtraArgs need to update the AWS bucket permissions on the AWS console
+        # <bucket_name> -> Permissions -> Edit bucket policy & Edit Access Control List depending on the use case.
         bucket_object = self.s3_connection.Object(bucket_name, file_name)
-        bucket_object.upload_file(Filename=file_name)
+        bucket_object.upload_file(Filename=file_name, ExtraArgs=extra_args)
         print(f"File {file_name} uploaded to bucket {bucket_name}")
+        return bucket_object
     
     def file_download(self, file_name, bucket_name=None):
         # Download the file from the bucket
@@ -75,4 +78,25 @@ class S3Bucket(BaseModel):
         destination_object = self.s3_connection.Object(destination_bucket_name, file_name)
         destination_object.copy(copy_source)
         print(f"File {file_name} copied from {source_bucket_name} to {destination_bucket_name}")
+
+def main():
+    print("Starting S3 test...")
+    connection = S3Bucket(choice="resource")
+    connection.setup_connection()
+    first_bucket = connection.get_bucket("firstpythonbucket0d711e2e-ea97-4f72-b6e4-8fd2d0e74865")
+    second_bucket = connection.get_bucket("secondpythonbucket354dcdfc-26ec-4fd1-b0af-4502afe18eb8")
+    second_file = connection.create_temp_file(100, "secondfile.txt", "This is a test file")
+    second_bucket_object = connection.file_upload(second_file, bucket_name=second_bucket.name, extra_args={'ACL': 'public-read'})
+    # Reading the Acl from the object
+    second_object_acl = second_bucket_object.Acl()
+    print(f"Second Object grants: {second_object_acl.grants}")
     
+    # Making the object private again
+    second_object_acl.put(ACL='private')
+    print(f"Second Object grants after permission change: {second_object_acl.grants}")
+    
+    
+
+if __name__ == "__main__":
+    main()
+    # Example usage
